@@ -13,13 +13,6 @@ export const Route = createFileRoute("/portal")({
 
 function PortalPage() {
   const navigate = useNavigate();
-
-  // Check auth
-  if (!getStoredAuth()) {
-    navigate({ to: "/login" });
-    return null;
-  }
-
   const [files] = useState<UploadedFile[]>(mockFiles);
   const [selectedFileId, setSelectedFileId] = useState<string>(mockFiles[0].id);
   const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages);
