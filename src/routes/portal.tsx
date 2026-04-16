@@ -58,6 +58,10 @@ function PortalPage() {
     console.log("Uploading files:", _files.map((f) => f.name));
   }, []);
 
+  if (!isAuthed) {
+    return <div className="min-h-screen bg-obsidian-base flex items-center justify-center"><div className="size-2 rounded-full bg-aurora-cyan animate-pulse" /></div>;
+  }
+
   return (
     <div className="relative h-dvh w-full bg-obsidian-base overflow-hidden font-sans flex p-4 gap-4 box-border">
       {/* Ambient glows */}
