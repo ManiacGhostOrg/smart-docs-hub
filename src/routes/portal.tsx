@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { getStoredAuth } from "@/lib/auth";
 import { mockFiles, mockChatMessages, type UploadedFile, type ChatMessage, type Timestamp } from "@/lib/mock-data";
 import { PortalSidebar } from "@/components/PortalSidebar";
