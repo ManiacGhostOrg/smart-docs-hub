@@ -1,133 +1,240 @@
 import { Play } from "lucide-react";
-import { type UploadedFile, type Timestamp } from "@/lib/mock-data";
+import { type Asset, type ApiTimestamp } from "@/lib/api";
+
+const MAX_VIDEO_H = "min(35vh, 260px)";
 
 interface MediaViewerProps {
-  file: UploadedFile;
-  activeTimestamp: Timestamp | null;
-  onTimestampClick: (ts: Timestamp) => void;
+  asset: Asset | null;
+  summary: string | null;
+  summaryLoading: boolean;
+  activeTimestamp: ApiTimestamp | null;
+  playUrl: string | null;
+  onTimestampClick: (ts: ApiTimestamp) => void;
 }
 
-export function MediaViewer({ file, activeTimestamp, onTimestampClick }: MediaViewerProps) {
-  const isMedia = file.type === "audio" || file.type === "video";
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${String(m).padStart(2, "00")}:${String(s).padStart(2, "00")}`;
+}
+
+/**
+ * Renders a summary string that may contain bullet points (•, -, *)
+ * or newline-separated text as a proper bulleted list.
+ * Each bullet point appears on its own line with visible, bright text.
+ */
+function SummaryBody({ text }: { text: string }) {
+  // Remove any leading intro like "Here are N bullet points...:"
+  const cleaned = text.replace(/^[^•\-*\n]*:\s*/u, "").trim();
+
+  // Split on bullet chars or newlines, filter empty
+  const bullets = cleaned
+    .split(/[•\n]|(?<=\S)\s*[\-\*]\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (bullets.length <= 1) {
+    // No detectable bullets — render as a paragraph
+    return (
+      <p className="text-sm text-text-primary leading-relaxed font-light">
+        {text.trim()}
+      </p>
+    );
+  }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 glass-panel-rounded overflow-hidden">
-      {/* Header */}
-      <div className="px-8 py-6 flex items-center justify-between border-b border-glass-border/50 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="px-2.5 py-1 rounded-full bg-white/5 text-[10px] uppercase tracking-widest text-text-secondary border border-white/5">
-            {file.type}
+    <ul className="flex flex-col gap-2.5">
+      {bullets.map((point, i) => (
+        <li key={i} className="flex items-start gap-2.5">
+          <span className="mt-1.5 size-1.5 rounded-full bg-aurora-cyan shrink-0" />
+          <span className="text-sm text-text-primary leading-relaxed font-light">{point}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+
+export function MediaViewer({
+  asset,
+  summary,
+  summaryLoading,
+  activeTimestamp,
+  playUrl,
+  onTimestampClick,
+}: MediaViewerProps) {
+  if (!asset) {
+    return (
+      <div className="h-full glass-panel-rounded flex items-center justify-center">
+        <p className="text-text-tertiary text-sm">Select a file to view</p>
+      </div>
+    );
+  }
+
+  const assetType = asset.assetType?.toLowerCase() ?? "";
+  const isVideo = assetType.includes("video") || assetType.includes("mp4");
+  const isAudio = assetType.includes("audio") || assetType.includes("mp3") || assetType.includes("wav");
+  const isMedia = isVideo || isAudio;
+
+  return (
+    <div className="h-full glass-panel-rounded flex flex-col overflow-hidden">
+
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="px-4 py-3 flex items-center justify-between border-b border-glass-border/50 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="px-2 py-0.5 rounded-full bg-white/5 text-[9px] uppercase tracking-widest text-text-secondary border border-white/5 shrink-0">
+            {asset.assetType}
           </div>
-          <h1 className="text-lg font-light text-text-primary tracking-wide truncate">
-            {file.name}
+          <h1 className="text-sm font-light text-text-primary tracking-wide truncate">
+            {asset.originalFilename}
           </h1>
         </div>
-        <div className="text-xs text-text-tertiary shrink-0">{file.size}</div>
+        {asset.fileSize && (
+          <div className="text-[10px] text-text-tertiary shrink-0 ml-3">
+            {(asset.fileSize / 1024 / 1024).toFixed(1)} MB
+          </div>
+        )}
       </div>
 
-      {/* Content area */}
+      {/* ── Content (scrollable) ────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto">
-        {isMedia ? (
-          <div className="flex flex-col h-full">
-            {/* Video/Audio placeholder */}
-            <div className="relative flex-1 bg-obsidian-base m-2 rounded-3xl overflow-hidden min-h-[300px]">
-              <div className="absolute inset-0 bg-gradient-to-br from-aurora-violet/5 to-aurora-cyan/5" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <button className="size-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-text-primary cursor-pointer hover:bg-white/20 transition-colors border border-white/5 aurora-glow-cyan">
-                  <Play className="size-6 ml-1" />
-                </button>
-              </div>
 
-              {/* Bottom overlay with time */}
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-obsidian-base to-transparent">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="text-2xl font-light text-text-primary">
-                      {activeTimestamp?.time || "00:00"}{" "}
-                      <span className="text-text-secondary text-lg">/ {file.type === "video" ? "48:22" : "32:15"}</span>
-                    </div>
-                  </div>
-                  {activeTimestamp && (
-                    <div className="text-sm font-light text-text-secondary">
-                      Segment: <span className="text-text-primary font-medium">{activeTimestamp.label}</span>
-                    </div>
-                  )}
+        {isVideo ? (
+          <div className="flex flex-col gap-3 p-3">
+            {/* ── Video player — constrained height so summary is always visible ── */}
+            <div className="rounded-xl overflow-hidden bg-obsidian-base" style={{ maxHeight: MAX_VIDEO_H }}>
+              {playUrl ? (
+                <video
+                  key={playUrl}
+                  src={playUrl}
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain"
+                  style={{ maxHeight: MAX_VIDEO_H }}
+                />
+              ) : (
+                <div
+                  className="flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-aurora-violet/5 to-aurora-cyan/5"
+                  style={{ height: MAX_VIDEO_H }}
+                >
+                  <button className="size-14 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-text-primary hover:bg-white/20 transition-colors border border-white/5 aurora-glow-cyan">
+                    <Play className="size-5 ml-1" />
+                  </button>
+                  <p className="text-xs text-text-tertiary">Select a file or click a timestamp</p>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Timestamp markers */}
-            {file.timestamps && file.timestamps.length > 0 && (
-              <div className="px-6 pb-4 flex gap-2 overflow-x-auto">
-                {file.timestamps.map((ts) => (
-                  <button
-                    key={ts.seconds}
-                    onClick={() => onTimestampClick(ts)}
-                    className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all ${
-                      activeTimestamp?.seconds === ts.seconds
-                        ? "bg-aurora-cyan/10 border border-aurora-cyan/30 text-aurora-cyan"
-                        : "bg-obsidian-surface border border-glass-border text-text-secondary hover:text-text-primary hover:border-white/10"
-                    }`}
-                  >
-                    <Play className="size-3" />
-                    <span className="font-mono text-xs tabular-nums">{ts.time}</span>
-                    <span>{ts.label}</span>
-                  </button>
-                ))}
+            {/* ── Active timestamp pill (below video, not overlapping controls) ── */}
+            {activeTimestamp && (
+              <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-aurora-cyan/5 border border-aurora-cyan/20">
+                <span className="font-mono text-sm text-aurora-cyan tabular-nums">
+                  {activeTimestamp.time ?? formatTime(activeTimestamp.seconds)}
+                </span>
+                <span className="text-sm text-text-secondary font-light">
+                  {activeTimestamp.label || activeTimestamp.description}
+                </span>
               </div>
             )}
-          </div>
-        ) : (
-          /* PDF Summary View */
-          <div className="p-8 flex flex-col gap-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="px-3 py-1 rounded-full bg-aurora-violet/10 border border-aurora-violet/20 text-xs text-aurora-violet">
-                Document Summary
-              </div>
-            </div>
-            <p className="text-base font-light text-text-secondary leading-relaxed max-w-[65ch]">
-              {file.summary}
-            </p>
-          </div>
-        )}
 
-        {/* Transcript segments for media */}
-        {isMedia && file.transcriptSegments && (
-          <div className="px-8 pb-8 flex flex-col gap-4">
-            <div className="text-[10px] font-semibold tracking-[0.15em] text-text-tertiary uppercase">
-              Transcript
-            </div>
-            {file.transcriptSegments.map((seg, i) => (
-              <div
-                key={i}
-                className={`flex gap-4 p-3 rounded-xl transition-all ${
-                  activeTimestamp && Math.abs(seg.seconds - activeTimestamp.seconds) < 10
-                    ? "bg-aurora-cyan/5 border border-aurora-cyan/20"
-                    : "border border-transparent"
-                }`}
-              >
-                <span className="font-mono text-xs tabular-nums text-text-tertiary shrink-0 mt-0.5">
-                  {seg.time}
-                </span>
-                <p className="text-sm font-light text-text-secondary leading-relaxed">
-                  {seg.text}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Summary for media */}
-        {isMedia && file.summary && (
-          <div className="px-8 pb-8">
-            <div className="p-4 rounded-2xl border border-glass-border bg-obsidian-surface/50">
-              <div className="text-[10px] font-semibold tracking-[0.15em] text-text-tertiary uppercase mb-2">
+            {/* ── AI Summary (always below video) ──────────────────────────── */}
+            <div className="rounded-2xl border border-glass-border bg-obsidian-surface/50 p-4">
+              <div className="text-[9px] font-semibold tracking-[0.15em] text-text-tertiary uppercase mb-2">
                 AI Summary
               </div>
-              <p className="text-sm font-light text-text-secondary leading-relaxed">
-                {file.summary}
-              </p>
+              {summaryLoading ? (
+                <div className="flex flex-col gap-2">
+                  {[80, 95, 65].map((w, i) => (
+                    <div key={i} className="h-3 rounded bg-obsidian-surface-hover animate-pulse" style={{ width: `${w}%` }} />
+                  ))}
+                </div>
+              ) : summary ? (
+                <SummaryBody text={summary} />
+              ) : (
+                <p className="text-xs text-text-tertiary">Processing…</p>
+              )}
             </div>
+          </div>
+
+        ) : isAudio ? (
+          <div className="flex flex-col gap-3 p-3">
+            {/* ── Audio player ─────────────────────────────────────────── */}
+            <div className="rounded-2xl bg-obsidian-base overflow-hidden">
+              {playUrl ? (
+                <div className="p-4">
+                  <audio
+                    key={playUrl}
+                    src={playUrl}
+                    controls
+                    autoPlay
+                    className="w-full"
+                  />
+                </div>
+              ) : (
+                <div className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-aurora-violet/5 to-aurora-cyan/5">
+                  {/* Static waveform decoration */}
+                  <div className="flex items-end gap-0.5 h-10">
+                    {Array.from({ length: 36 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1 rounded-full bg-aurora-cyan/25"
+                        style={{ height: `${16 + Math.sin(i * 0.7) * 14}px` }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-text-tertiary">Click a timestamp to start playback</p>
+                </div>
+              )}
+            </div>
+
+            {/* Active timestamp */}
+            {activeTimestamp && (
+              <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-aurora-violet/5 border border-aurora-violet/20">
+                <span className="font-mono text-sm text-aurora-violet tabular-nums">
+                  {activeTimestamp.time ?? formatTime(activeTimestamp.seconds)}
+                </span>
+                <span className="text-sm text-text-secondary font-light">
+                  {activeTimestamp.label || activeTimestamp.description}
+                </span>
+              </div>
+            )}
+
+            {/* AI Summary */}
+            <div className="rounded-2xl border border-glass-border bg-obsidian-surface/50 p-4">
+              <div className="text-[9px] font-semibold tracking-[0.15em] text-text-tertiary uppercase mb-2">
+                AI Summary
+              </div>
+              {summaryLoading ? (
+                <div className="flex flex-col gap-2">
+                  {[80, 95, 65].map((w, i) => (
+                    <div key={i} className="h-3 rounded bg-obsidian-surface-hover animate-pulse" style={{ width: `${w}%` }} />
+                  ))}
+                </div>
+              ) : summary ? (
+                <SummaryBody text={summary} />
+              ) : (
+                <p className="text-xs text-text-tertiary">Processing…</p>
+              )}
+            </div>
+          </div>
+
+        ) : (
+          /* ── PDF / Document ──────────────────────────────────────── */
+          <div className="p-5 flex flex-col gap-4">
+            <div className="px-3 py-1 rounded-full bg-aurora-violet/10 border border-aurora-violet/20 text-xs text-aurora-violet w-fit">
+              Document Summary
+            </div>
+            {summaryLoading ? (
+              <div className="flex flex-col gap-3">
+                {[90, 75, 60].map((w, i) => (
+                  <div key={i} className="h-4 rounded bg-obsidian-surface animate-pulse" style={{ width: `${w}%` }} />
+                ))}
+              </div>
+            ) : summary ? (
+              <SummaryBody text={summary} />
+            ) : (
+              <p className="text-sm text-text-tertiary">No summary available yet.</p>
+            )}
           </div>
         )}
       </div>

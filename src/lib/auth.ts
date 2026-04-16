@@ -1,83 +1,52 @@
-// Mock auth service — replace these functions with your actual API calls
-// to your JWT + MFA backend
+// Auth helpers — thin wrappers around localStorage + api.ts
+import { apiRegister, apiLogin, apiVerifyOtp, type AuthUser, type RegisterPayload } from "./api";
 
-interface LoginResponse {
-  requiresMfa: boolean;
-  tempToken?: string;
-  token?: string;
-  user?: User;
-}
-
-interface MfaResponse {
-  token: string;
-  user: User;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-}
+export type { AuthUser };
 
 const AUTH_TOKEN_KEY = "auth_token";
 const AUTH_USER_KEY = "auth_user";
 
-// Replace with your actual API base URL
-const API_BASE = "/api";
+// localStorage is browser-only — SSR (TanStack Start server pass) has no window
+const isBrowser = typeof window !== "undefined";
 
-export async function loginWithCredentials(
-  email: string,
-  password: string
-): Promise<LoginResponse> {
-  // MOCK: In production, call your backend:
-  // const res = await fetch(`${API_BASE}/auth/login`, { method: 'POST', body: JSON.stringify({ email, password }) });
-  // return res.json();
-
-  // Simulate: always require MFA
-  await new Promise((r) => setTimeout(r, 800));
-  if (email && password) {
-    return { requiresMfa: true, tempToken: "temp_" + Date.now() };
-  }
-  throw new Error("Invalid credentials");
+export async function registerUser(payload: RegisterPayload) {
+  return apiRegister(payload);
 }
 
-export async function verifyMfa(
-  tempToken: string,
-  otp: string
-): Promise<MfaResponse> {
-  // MOCK: In production, call your backend:
-  // const res = await fetch(`${API_BASE}/auth/verify-mfa`, { method: 'POST', body: JSON.stringify({ tempToken, otp }) });
-  // return res.json();
+export async function loginWithCredentials(email: string, password: string) {
+  return apiLogin({ email, password });
+}
 
-  await new Promise((r) => setTimeout(r, 600));
-  if (otp.length === 6) {
-    const user = { id: "1", name: "Operator", email: "operator@axiom.dev" };
-    const token = "jwt_" + Date.now();
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
+export async function verifyMfa(email: string, otp: string): Promise<AuthUser> {
+  const user = await apiVerifyOtp({ email, otp });
+  if (isBrowser) {
+    localStorage.setItem(AUTH_TOKEN_KEY, user.token);
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-    return { token, user };
   }
-  throw new Error("Invalid OTP");
+  return user;
 }
 
-export function getStoredAuth(): { token: string; user: User } | null {
+export function getStoredAuth(): { token: string; user: AuthUser } | null {
+  if (!isBrowser) return null;
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
   const userStr = localStorage.getItem(AUTH_USER_KEY);
   if (token && userStr) {
-    return { token, user: JSON.parse(userStr) };
+    try {
+      return { token, user: JSON.parse(userStr) as AuthUser };
+    } catch {
+      return null;
+    }
   }
   return null;
 }
 
 export function logout() {
+  if (!isBrowser) return;
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_USER_KEY);
 }
 
 export function getAuthHeaders(): Record<string, string> {
   const auth = getStoredAuth();
-  if (auth) {
-    return { Authorization: `Bearer ${auth.token}` };
-  }
-  return {};
+  return auth ? { Authorization: `Bearer ${auth.token}` } : {};
 }
