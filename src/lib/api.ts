@@ -10,9 +10,16 @@ function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
 
+// Required for ngrok free tier — skips the browser interstitial warning page
+const NGROK_HEADER: Record<string, string> = {
+  "ngrok-skip-browser-warning": "true",
+};
+
 function authHeaders(): Record<string, string> {
   const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return token
+    ? { Authorization: `Bearer ${token}`, ...NGROK_HEADER }
+    : { ...NGROK_HEADER };
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -44,7 +51,7 @@ export interface RegisterResponse {
 export async function apiRegister(payload: RegisterPayload): Promise<RegisterResponse> {
   const res = await fetch(`${API_BASE}/api/auth/register`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...NGROK_HEADER },
     body: JSON.stringify(payload),
   });
   return handleResponse<RegisterResponse>(res);
@@ -62,7 +69,7 @@ export interface LoginResponse {
 export async function apiLogin(payload: LoginPayload): Promise<LoginResponse> {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...NGROK_HEADER },
     body: JSON.stringify(payload),
   });
   return handleResponse<LoginResponse>(res);
@@ -83,7 +90,7 @@ export interface AuthUser {
 export async function apiVerifyOtp(payload: VerifyOtpPayload): Promise<AuthUser> {
   const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...NGROK_HEADER },
     body: JSON.stringify(payload),
   });
   return handleResponse<AuthUser>(res);
