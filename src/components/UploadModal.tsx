@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Upload, X, FileText, Headphones, Video, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Upload, X, FileText, Headphones, Video, Image as ImageIcon, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { apiUploadAsset, type Asset } from "@/lib/api";
 
 interface UploadModalProps {
@@ -19,6 +19,7 @@ const getFileIcon = (type: string) => {
   if (type.includes("pdf"))   return <FileText className="size-4" />;
   if (type.includes("audio")) return <Headphones className="size-4" />;
   if (type.includes("video")) return <Video className="size-4" />;
+  if (type.includes("image")) return <ImageIcon className="size-4" />;
   return <FileText className="size-4" />;
 };
 
@@ -148,7 +149,7 @@ export function UploadModal({ open, onClose, onUploadComplete }: UploadModalProp
           <Upload className={`size-6 ${dragOver ? "text-aurora-cyan" : "text-text-tertiary"}`} />
           <div className="text-center">
             <div className="text-sm text-text-primary">Drop files or click to browse</div>
-            <div className="text-xs text-text-tertiary mt-1">PDF · MP3 · MP4 · WAV and more</div>
+            <div className="text-xs text-text-tertiary mt-1">PDF · MP3 · MP4 · WAV · JPG · PNG and more</div>
           </div>
         </div>
 
@@ -156,7 +157,7 @@ export function UploadModal({ open, onClose, onUploadComplete }: UploadModalProp
           ref={inputRef}
           type="file"
           multiple
-          accept=".pdf,.mp3,.mp4,.wav,.m4a,.avi,.mov,.webm"
+          accept=".pdf,.mp3,.mp4,.wav,.m4a,.avi,.mov,.webm,.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff"
           onChange={(e) => e.target.files && addFiles(Array.from(e.target.files))}
           className="hidden"
         />
